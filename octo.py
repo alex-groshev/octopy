@@ -1,6 +1,7 @@
 import sys
 from ConfigParser import ConfigParser
 import requests
+import dateutil.parser
 
 
 def prepare_url(server, command):
@@ -13,6 +14,19 @@ def prepare_url(server, command):
         url += '/deployments'
         command_type = 2
     return url, command_type
+
+
+def cmd_environments(response):
+    for env in response:
+        print 'ID: %s, Name: %s' % (env['Id'], env['Name'])
+
+
+def cmd_deployments(response):
+    for dep in response['Items']:
+        dt = dateutil.parser.parse(dep['Created'])
+        print 'ID: %s, Name: %s, Created: %s at %s' %\
+              (dep['Id'], dep['Name'], dt.date(), dt.time().strftime('%H:%M'))
+
 
 
 def main(command):
@@ -38,13 +52,9 @@ def main(command):
     response = requests.get(url, headers=headers).json()
 
     if command_type == 1:
-        print 'Environments'
-        for env in response:
-            print 'ID: %s, Name: %s' % (env['Id'], env['Name'])
+        cmd_environments(response)
     elif command_type == 2:
-        print 'Deployments'
-        for dep in response['Items']:
-            print 'ID: %s, Name: %s, Created: %s' % (dep['Id'], dep['Name'], dep['Created'])
+        cmd_deployments(response)
 
 
 if __name__ == '__main__':
