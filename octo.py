@@ -4,16 +4,26 @@ import requests
 import dateutil.parser
 
 
-def prepare_url(server, command):
-    command_type = 0
-    url = server + '/api'
-    if command == 'env' or command == 'environments':
-        url += '/environments/all'
-        command_type = 1
-    elif command == 'dep' or command == 'deployments':
-        url += '/deployments'
-        command_type = 2
-    return url, command_type
+class OctopyUrlFactory:
+    def __init__(self, server):
+        self.server = server
+
+    def get_url(self, command):
+        if command == 'env' or command == 'environments':
+            return self.url_environments(), 1
+        elif command == 'dep' or command == 'deployments':
+            return self.url_deployments(), 2
+        else:
+            return None, 0
+
+    def url_api(self):
+        return self.server + '/api'
+
+    def url_environments(self):
+        return self.url_api() + '/environments/all'
+
+    def url_deployments(self):
+        return self.url_api() + '/deployments'
 
 
 def cmd_environments(response):
@@ -26,7 +36,6 @@ def cmd_deployments(response):
         dt = dateutil.parser.parse(dep['Created'])
         print 'ID: %s, Name: %s, Created: %s at %s' %\
               (dep['Id'], dep['Name'], dt.date(), dt.time().strftime('%H:%M'))
-
 
 
 def main(command):
@@ -44,9 +53,11 @@ def main(command):
         'X-Octopus-ApiKey': api_key
     }
 
-    url, command_type = prepare_url(server, command)
+    octopyUrlFactory = OctopyUrlFactory(server)
+    url, command_type = octopyUrlFactory.get_url(command)
+
     if command_type == 0:
-        print 'Unknown command'
+        print "Unknown command '%s'" % command
         sys.exit(1)
 
     response = requests.get(url, headers=headers).json()
