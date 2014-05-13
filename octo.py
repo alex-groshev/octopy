@@ -59,6 +59,12 @@ def main(command):
         print "Unknown command '%s'" % command
         sys.exit(1)
 
+    # Get environments because we'll need them
+    response = OctoScraper.scrape(octopyUrlFactory.url_environment(), headers)
+    environments = {}
+    for env in response:
+        environments[env['Id']] = env['Name']
+
     response = OctoScraper.scrape(url, headers)
 
     if command_type == 1:
@@ -66,10 +72,8 @@ def main(command):
     elif command_type == 2:
         print 'Date,Time,Environment'
         for dep in response['Items']:
-            #TBD: get rid of factory and get a link from Links?
-            env = OctoScraper.scrape(octopyUrlFactory.url_environment(dep['EnvironmentId']), headers)
             dt = dateutil.parser.parse(dep['Created'])
-            print '%s,%s,%s' % (dt.date(), dt.time().strftime('%H:%M'), env['Name'])
+            print '%s,%s,%s' % (dt.date(), dt.time().strftime('%H:%M'), environments[dep['EnvironmentId']])
 
 
 if __name__ == '__main__':
