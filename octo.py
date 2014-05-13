@@ -26,16 +26,15 @@ class OctopyUrlFactory:
         return self.url_api() + '/deployments'
 
 
+class OctoScraper:
+    @staticmethod
+    def scrape(url, headers):
+        return requests.get(url, headers=headers).json()
+
+
 def cmd_environments(response):
     for env in response:
         print 'ID: %s, Name: %s' % (env['Id'], env['Name'])
-
-
-def cmd_deployments(response):
-    for dep in response['Items']:
-        dt = dateutil.parser.parse(dep['Created'])
-        print 'ID: %s, Name: %s, Created: %s at %s' %\
-              (dep['Id'], dep['Name'], dt.date(), dt.time().strftime('%H:%M'))
 
 
 def main(command):
@@ -60,12 +59,17 @@ def main(command):
         print "Unknown command '%s'" % command
         sys.exit(1)
 
-    response = requests.get(url, headers=headers).json()
+    response = OctoScraper.scrape(url, headers)
 
     if command_type == 1:
         cmd_environments(response)
     elif command_type == 2:
-        cmd_deployments(response)
+        print 'Date,Time,Environment'
+        for dep in response['Items']:
+            #TBD: get rid of factory and get a link from Links?
+            env = OctoScraper.scrape(octopyUrlFactory.url_environment(dep['EnvironmentId']), headers)
+            dt = dateutil.parser.parse(dep['Created'])
+            print '%s,%s,%s' % (dt.date(), dt.time().strftime('%H:%M'), env['Name'])
 
 
 if __name__ == '__main__':
