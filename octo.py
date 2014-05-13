@@ -10,7 +10,7 @@ class OctopyUrlFactory:
 
     def get_url(self, command):
         if command == 'env' or command == 'environments':
-            return self.url_environments(), 1
+            return self.url_environment(), 1
         elif command == 'dep' or command == 'deployments':
             return self.url_deployments(), 2
         else:
@@ -19,8 +19,8 @@ class OctopyUrlFactory:
     def url_api(self):
         return self.server + '/api'
 
-    def url_environments(self):
-        return self.url_api() + '/environments/all'
+    def url_environment(self, env_id='all'):
+        return self.url_api() + '/environments/all' if env_id == 'all' else self.url_api() + '/environments/' + env_id
 
     def url_deployments(self):
         return self.url_api() + '/deployments'
