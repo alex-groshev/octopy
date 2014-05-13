@@ -4,7 +4,7 @@ import requests
 import dateutil.parser
 
 
-class OctopyUrlFactory:
+class UrlFactory:
     def __init__(self, server):
         self.server = server
 
@@ -25,55 +25,72 @@ class OctopyUrlFactory:
     def url_deployments(self):
         return self.url_api() + '/deployments'
 
+    def url_release(self, rel_id='all'):
+        return self.url_api() + '/releases' if rel_id == 'all' else self.url_api() + '/releases/' + rel_id
+
 
 class OctoScraper:
     @staticmethod
-    def scrape(url, headers):
-        return requests.get(url, headers=headers).json()
+    def scrape(url, api_key):
+        return requests.get(url, headers={'X-Octopus-ApiKey': api_key}).json()
 
 
-def cmd_environments(response):
+def get_configs(conf_file):
+    result = {}
+    cp = ConfigParser()
+    cp.read(conf_file)
+    result['server'] = cp.get('Octopus', 'server')
+    result['api_key'] = cp.get('Octopus', 'api_key')
+    return result
+
+
+def parse_environments(response):
+    result = {}
     for env in response:
-        print 'ID: %s, Name: %s' % (env['Id'], env['Name'])
+        result[env['Id']] = env['Name']
+    return result
+
+
+def parse_releases(response):
+    result = {}
+    for rel in response['Items']:
+        result[rel['Id']] = rel['Version']
+    return result
 
 
 def main(command):
-    config = ConfigParser()
-    config.read('octopy.cfg')
+    config = get_configs('octopy.cfg')
 
-    server = config.get('Octopus', 'server')
-    api_key = config.get('Octopus', 'api_key')
-
-    if not server or not api_key:
+    if not config['server'] or not config['api_key']:
         print 'Please, specify Octopus parameters in configuration file!'
         sys.exit(1)
 
-    headers = {
-        'X-Octopus-ApiKey': api_key
-    }
-
-    octopyUrlFactory = OctopyUrlFactory(server)
-    url, command_type = octopyUrlFactory.get_url(command)
+    urlFactory = UrlFactory(config['server'])
+    url, command_type = urlFactory.get_url(command)
 
     if command_type == 0:
         print "Unknown command '%s'" % command
         sys.exit(1)
 
-    # Get environments because we'll need them
-    response = OctoScraper.scrape(octopyUrlFactory.url_environment(), headers)
-    environments = {}
-    for env in response:
-        environments[env['Id']] = env['Name']
-
-    response = OctoScraper.scrape(url, headers)
+    environments = parse_environments(OctoScraper.scrape(urlFactory.url_environment(), config['api_key']))
 
     if command_type == 1:
-        cmd_environments(response)
+        print 'Id,Name'
+        for env in environments.keys():
+            print '%s,%s' % (env, environments[env])
     elif command_type == 2:
-        print 'Date,Time,Environment'
-        for dep in response['Items']:
+        print 'Date,Time,Environment,Release'
+
+        deployments = OctoScraper.scrape(url, config['api_key'])
+        releases = parse_releases(OctoScraper.scrape(urlFactory.url_release(), config['api_key']))
+
+        for dep in deployments['Items']:
             dt = dateutil.parser.parse(dep['Created'])
-            print '%s,%s,%s' % (dt.date(), dt.time().strftime('%H:%M'), environments[dep['EnvironmentId']])
+            if dep['ReleaseId'] not in releases:
+                rel = OctoScraper.scrape(urlFactory.url_release(dep['ReleaseId']), config['api_key'])
+                releases[rel['Id']] = rel['Version']
+            print '%s,%s,%s,%s' %\
+                  (dt.date(), dt.time().strftime('%H:%M'), environments[dep['EnvironmentId']], releases[dep['ReleaseId']])
 
 
 if __name__ == '__main__':
