@@ -2,6 +2,7 @@ import sys
 from ConfigParser import ConfigParser
 import requests
 import dateutil.parser
+import argparse
 
 
 class UrlFactory:
@@ -68,28 +69,40 @@ def parse_projects(response):
     return result
 
 
-def main(command):
+def main():
     config = get_configs('octopy.cfg')
 
     if not config['server'] or not config['api_key']:
         print 'Please, specify Octopus parameters in configuration file!'
         sys.exit(1)
 
+    parser = argparse.ArgumentParser(description='OctoPy is a small application that prints out information from Octopus in a convenient format.')
+    parser.add_argument('--cmd', dest='command', help="Octopy command (try `env` and `dep`).")
+    parser.add_argument('--headings', dest='headings', action='store_true', help='Display headings in output.')
+    args = parser.parse_args()
+
+    if args.command is None:
+        print "Please specify command"
+        parser.print_help()
+        sys.exit(1)
+
     urlFactory = UrlFactory(config['server'])
-    url, command_type = urlFactory.get_url(command)
+    url, command_type = urlFactory.get_url(args.command)
 
     if command_type == 0:
-        print "Unknown command '%s'" % command
+        print "Unknown command '%s'" % args.command
         sys.exit(1)
 
     environments = parse_environments(OctoScraper.scrape(urlFactory.url_environment(), config['api_key']))
 
     if command_type == 1:
-        print 'Id,Name'
+        if args.headings:
+            print 'Id,Name'
         for env in environments.keys():
             print '%s,%s' % (env, environments[env])
     elif command_type == 2:
-        print 'Date,Time,Environment,Project,Release'
+        if args.headings:
+            print 'Date,Time,Environment,Project,Release'
 
         deployments = OctoScraper.scrape(url, config['api_key'])
         projects = OctoScraper.scrape(urlFactory.url_project(), config['api_key'])
@@ -111,4 +124,4 @@ def main(command):
 
 
 if __name__ == '__main__':
-    main(sys.argv[1])
+    main()
