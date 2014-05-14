@@ -33,10 +33,8 @@ class UrlFactory:
         return self.url_api() + '/projects' if proj_id == 'all' else self.url_api() + '/projects/' + proj_id
 
 
-class OctoScraper:
-    @staticmethod
-    def scrape(url, api_key):
-        return requests.get(url, headers={'X-Octopus-ApiKey': api_key}).json()
+def scrape(url, api_key):
+    return requests.get(url, headers={'X-Octopus-ApiKey': api_key}).json()
 
 
 def get_configs(conf_file):
@@ -93,7 +91,7 @@ def main():
         print "Unknown command '%s'" % args.command
         sys.exit(1)
 
-    environments = parse_environments(OctoScraper.scrape(urlFactory.url_environment(), config['api_key']))
+    environments = parse_environments(scrape(urlFactory.url_environment(), config['api_key']))
 
     if command_type == 1:
         if args.headings:
@@ -104,19 +102,19 @@ def main():
         if args.headings:
             print 'Date,Time,Environment,Project,Release'
 
-        deployments = OctoScraper.scrape(url, config['api_key'])
-        projects = OctoScraper.scrape(urlFactory.url_project(), config['api_key'])
-        releases = parse_releases(OctoScraper.scrape(urlFactory.url_release(), config['api_key']))
+        deployments = scrape(url, config['api_key'])
+        projects = scrape(urlFactory.url_project(), config['api_key'])
+        releases = parse_releases(scrape(urlFactory.url_release(), config['api_key']))
 
         for dep in deployments['Items']:
             dt = dateutil.parser.parse(dep['Created'])
 
             if dep['ReleaseId'] not in releases:
-                rel = OctoScraper.scrape(urlFactory.url_release(dep['ReleaseId']), config['api_key'])
+                rel = scrape(urlFactory.url_release(dep['ReleaseId']), config['api_key'])
                 releases[rel['Id']] = rel['Version']
 
             if dep['ProjectId'] not in projects:
-                proj = OctoScraper.scrape(urlFactory.url_project(dep['ProjectId']), config['api_key'])
+                proj = scrape(urlFactory.url_project(dep['ProjectId']), config['api_key'])
                 projects[proj['Id']] = proj['Name']
 
             print '%s,%s,%s,%s,%s' %\
