@@ -10,9 +10,9 @@ class UrlFactory:
         self.server = server
 
     def get_url(self, command):
-        if command == 'env' or command == 'environments':
+        if command == 'env':
             return self.url_environment(), 1
-        elif command == 'dep' or command == 'deployments':
+        elif command == 'dep':
             return self.url_deployments(), 2
         else:
             return None, 0
