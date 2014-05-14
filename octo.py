@@ -28,6 +28,9 @@ class UrlFactory:
     def url_release(self, rel_id='all'):
         return self.url_api() + '/releases' if rel_id == 'all' else self.url_api() + '/releases/' + rel_id
 
+    def url_project(self, proj_id='all'):
+        return self.url_api() + '/projects' if proj_id == 'all' else self.url_api() + '/projects/' + proj_id
+
 
 class OctoScraper:
     @staticmethod
@@ -58,6 +61,13 @@ def parse_releases(response):
     return result
 
 
+def parse_projects(response):
+    result = {}
+    for proj in response['Items']:
+        result[proj['Id']] = proj['Version']
+    return result
+
+
 def main(command):
     config = get_configs('octopy.cfg')
 
@@ -79,18 +89,25 @@ def main(command):
         for env in environments.keys():
             print '%s,%s' % (env, environments[env])
     elif command_type == 2:
-        print 'Date,Time,Environment,Release'
+        print 'Date,Time,Environment,Project,Release'
 
         deployments = OctoScraper.scrape(url, config['api_key'])
+        projects = OctoScraper.scrape(urlFactory.url_project(), config['api_key'])
         releases = parse_releases(OctoScraper.scrape(urlFactory.url_release(), config['api_key']))
 
         for dep in deployments['Items']:
             dt = dateutil.parser.parse(dep['Created'])
+
             if dep['ReleaseId'] not in releases:
                 rel = OctoScraper.scrape(urlFactory.url_release(dep['ReleaseId']), config['api_key'])
                 releases[rel['Id']] = rel['Version']
-            print '%s,%s,%s,%s' %\
-                  (dt.date(), dt.time().strftime('%H:%M'), environments[dep['EnvironmentId']], releases[dep['ReleaseId']])
+
+            if dep['ProjectId'] not in projects:
+                proj = OctoScraper.scrape(urlFactory.url_project(dep['ProjectId']), config['api_key'])
+                projects[proj['Id']] = proj['Name']
+
+            print '%s,%s,%s,%s,%s' %\
+                  (dt.date(), dt.time().strftime('%H:%M'), environments[dep['EnvironmentId']], projects[dep['ProjectId']], releases[dep['ReleaseId']])
 
 
 if __name__ == '__main__':
