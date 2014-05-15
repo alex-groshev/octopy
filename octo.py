@@ -79,6 +79,15 @@ def save_objects(dir_name, file_name, objects):
             w.writerow([k, objects[k]])
 
 
+def save_list(dir_name, file_name, list):
+    if not os.path.isdir(dir_name):
+        os.makedirs(dir_name)
+    keys = ['Id', 'Date', 'Time', 'Environment', 'Project', 'Release']
+    with open('%s/%s' % (dir_name, file_name), 'w') as f:
+        w = csv.DictWriter(f, keys, delimiter=',', quotechar='|', lineterminator='\n')
+        w.writerows(list)
+
+
 def main():
     config = get_configs('octopy.cfg')
 
@@ -118,9 +127,10 @@ def main():
         if args.headings:
             print 'Date,Time,Environment,Project,Release'
 
-        response = scrape(url, config['api_key'])
         projects = parse_projects(scrape(urlFactory.url_project(), config['api_key']))
         releases = parse_releases(scrape(urlFactory.url_release(), config['api_key']))
+        response = scrape(url, config['api_key'])
+        deployments = []
 
         for dep in response['Items']:
             dt = dateutil.parser.parse(dep['Created'])
@@ -133,11 +143,21 @@ def main():
                 proj = scrape(urlFactory.url_project(dep['ProjectId']), config['api_key'])
                 projects[proj['Id']] = proj['Name']
 
+            deployment = {
+                'Id': dep['Id'],
+                'Date': dt.date(),
+                'Time': dt.time().strftime('%H:%M'),
+                'Environment': environments[dep['EnvironmentId']],
+                'Project': projects[dep['ProjectId']],
+                'Release': releases[dep['ReleaseId']]
+            }
+            deployments.append(deployment)
             print '%s,%s,%s,%s,%s' %\
-                  (dt.date(), dt.time().strftime('%H:%M'), environments[dep['EnvironmentId']], projects[dep['ProjectId']], releases[dep['ReleaseId']])
+                  (deployment['Date'], deployment['Time'], deployment['Environment'], deployment['Project'], deployment['Release'])
 
         save_objects(config['dir_tmp'], 'projects.csv', projects)
         save_objects(config['dir_tmp'], 'releases.csv', releases)
+        save_list(config['dir_tmp'], 'deployments.csv', deployments)
 
 
 if __name__ == '__main__':
