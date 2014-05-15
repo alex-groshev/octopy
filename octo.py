@@ -3,6 +3,8 @@ from ConfigParser import ConfigParser
 import requests
 import dateutil.parser
 import argparse
+import csv
+import os
 
 
 class UrlFactory:
@@ -43,6 +45,7 @@ def get_configs(conf_file):
     cp.read(conf_file)
     result['server'] = cp.get('Octopus', 'server')
     result['api_key'] = cp.get('Octopus', 'api_key')
+    result['dir_tmp'] = cp.get('Octopus', 'dir_tmp')
     return result
 
 
@@ -67,6 +70,15 @@ def parse_projects(response):
     return result
 
 
+def save_objects(dir_name, file_name, objects):
+    if not os.path.isdir(dir_name):
+        os.makedirs(dir_name)
+    with open('%s/%s' % (dir_name, file_name), 'w') as f:
+        w = csv.writer(f, delimiter=',', quotechar='|', lineterminator='\n')
+        for k in objects.keys():
+            w.writerow([k, objects[k]])
+
+
 def main():
     config = get_configs('octopy.cfg')
 
@@ -76,6 +88,7 @@ def main():
 
     parser = argparse.ArgumentParser(description='OctoPy is a small application that prints out information from Octopus in a convenient format.')
     parser.add_argument('--cmd', dest='command', help="Octopy command (try `env` and `dep`).")
+    #parser.add_argument('--cache', dest='cache', action='store_true', help="Read data from cache if available.")
     parser.add_argument('--headings', dest='headings', action='store_true', help='Display headings in output.')
     args = parser.parse_args()
 
@@ -92,6 +105,9 @@ def main():
         sys.exit(1)
 
     environments = parse_environments(scrape(urlFactory.url_environment(), config['api_key']))
+    for env in environments.keys():
+        environments[env] = environments[env]
+    save_objects(config['dir_tmp'], 'environments.csv', environments)
 
     if command_type == 1:
         if args.headings:
@@ -102,11 +118,11 @@ def main():
         if args.headings:
             print 'Date,Time,Environment,Project,Release'
 
-        deployments = scrape(url, config['api_key'])
+        response = scrape(url, config['api_key'])
         projects = parse_projects(scrape(urlFactory.url_project(), config['api_key']))
         releases = parse_releases(scrape(urlFactory.url_release(), config['api_key']))
 
-        for dep in deployments['Items']:
+        for dep in response['Items']:
             dt = dateutil.parser.parse(dep['Created'])
 
             if dep['ReleaseId'] not in releases:
@@ -119,6 +135,9 @@ def main():
 
             print '%s,%s,%s,%s,%s' %\
                   (dt.date(), dt.time().strftime('%H:%M'), environments[dep['EnvironmentId']], projects[dep['ProjectId']], releases[dep['ReleaseId']])
+
+        save_objects(config['dir_tmp'], 'projects.csv', projects)
+        save_objects(config['dir_tmp'], 'releases.csv', releases)
 
 
 if __name__ == '__main__':
