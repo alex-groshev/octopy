@@ -63,7 +63,7 @@ def parse_releases(response):
 def parse_projects(response):
     result = {}
     for proj in response['Items']:
-        result[proj['Id']] = proj['Version']
+        result[proj['Id']] = proj['Name']
     return result
 
 
@@ -103,7 +103,7 @@ def main():
             print 'Date,Time,Environment,Project,Release'
 
         deployments = scrape(url, config['api_key'])
-        projects = scrape(urlFactory.url_project(), config['api_key'])
+        projects = parse_projects(scrape(urlFactory.url_project(), config['api_key']))
         releases = parse_releases(scrape(urlFactory.url_release(), config['api_key']))
 
         for dep in deployments['Items']:
