@@ -79,6 +79,15 @@ def save_objects(dir_name, file_name, objects):
             w.writerow([k, objects[k]])
 
 
+def read_objects(dir_name, file_name):
+    result = {}
+    with open('%s/%s' % (dir_name, file_name), 'r') as f:
+        reader = csv.reader(f, delimiter=',', quotechar='|', lineterminator='\n')
+        for row in reader:
+            result[row[0]] = row[1]
+    return result
+
+
 def save_list(dir_name, file_name, list):
     if not os.path.isdir(dir_name):
         os.makedirs(dir_name)
@@ -97,7 +106,7 @@ def main():
 
     parser = argparse.ArgumentParser(description='OctoPy is a small application that prints out information from Octopus in a convenient format.')
     parser.add_argument('--cmd', dest='command', help="Octopy command (try `env` and `dep`).")
-    #parser.add_argument('--cache', dest='cache', action='store_true', help="Read data from cache if available.")
+    parser.add_argument('--cache', dest='cache', action='store_true', help="Read data from cache if available.")
     parser.add_argument('--headings', dest='headings', action='store_true', help='Display headings in output.')
     args = parser.parse_args()
 
@@ -113,10 +122,13 @@ def main():
         print "Unknown command '%s'" % args.command
         sys.exit(1)
 
-    environments = parse_environments(scrape(urlFactory.url_environment(), config['api_key']))
-    for env in environments.keys():
-        environments[env] = environments[env]
-    save_objects(config['dir_tmp'], 'environments.csv', environments)
+    if args.cache:
+        environments = read_objects(config['dir_tmp'], 'environments.csv')
+    else:
+        environments = parse_environments(scrape(urlFactory.url_environment(), config['api_key']))
+        for env in environments.keys():
+            environments[env] = environments[env]
+        save_objects(config['dir_tmp'], 'environments.csv', environments)
 
     if command_type == 1:
         if args.headings:
