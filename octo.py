@@ -7,6 +7,16 @@ import csv
 import os
 
 
+def get_configs(conf_file):
+    result = {}
+    cp = ConfigParser()
+    cp.read(conf_file)
+    result['server'] = cp.get('Octopus', 'server')
+    result['api_key'] = cp.get('Octopus', 'api_key')
+    result['dir_tmp'] = cp.get('Octopus', 'dir_tmp')
+    return result
+
+
 class UrlFactory:
     def __init__(self, server):
         self.server = server
@@ -39,34 +49,10 @@ def scrape(url, api_key):
     return requests.get(url, headers={'X-Octopus-ApiKey': api_key}).json()
 
 
-def get_configs(conf_file):
+def extract_objects(json, o_id, o_value):
     result = {}
-    cp = ConfigParser()
-    cp.read(conf_file)
-    result['server'] = cp.get('Octopus', 'server')
-    result['api_key'] = cp.get('Octopus', 'api_key')
-    result['dir_tmp'] = cp.get('Octopus', 'dir_tmp')
-    return result
-
-
-def parse_environments(response):
-    result = {}
-    for env in response:
-        result[env['Id']] = env['Name']
-    return result
-
-
-def parse_releases(response):
-    result = {}
-    for rel in response['Items']:
-        result[rel['Id']] = rel['Version']
-    return result
-
-
-def parse_projects(response):
-    result = {}
-    for proj in response['Items']:
-        result[proj['Id']] = proj['Name']
+    for obj in json:
+        result[obj[o_id]] = obj[o_value]
     return result
 
 
@@ -97,6 +83,16 @@ def save_list(dir_name, file_name, list):
         w.writerows(list)
 
 
+def read_list(dir_name, file_name):
+    result = []
+    keys = ['Id', 'Date', 'Time', 'Environment', 'Project', 'Release']
+    with open('%s/%s' % (dir_name, file_name), 'r') as f:
+        reader = csv.DictReader(f, keys, delimiter=',', quotechar='|', lineterminator='\n')
+        for row in reader:
+            result.append(row)
+    return result
+
+
 def main():
     config = get_configs('octopy.cfg')
 
@@ -125,7 +121,7 @@ def main():
     if args.cache:
         environments = read_objects(config['dir_tmp'], 'environments.csv')
     else:
-        environments = parse_environments(scrape(urlFactory.url_environment(), config['api_key']))
+        environments = extract_objects(scrape(urlFactory.url_environment(), config['api_key']), 'Id', 'Name')
         for env in environments.keys():
             environments[env] = environments[env]
         save_objects(config['dir_tmp'], 'environments.csv', environments)
@@ -139,8 +135,16 @@ def main():
         if args.headings:
             print 'Date,Time,Environment,Project,Release'
 
-        projects = parse_projects(scrape(urlFactory.url_project(), config['api_key']))
-        releases = parse_releases(scrape(urlFactory.url_release(), config['api_key']))
+        if args.cache:
+            deployments = read_list(config['dir_tmp'], 'deployments.csv')
+            for deployment in deployments:
+                print '%s,%s,%s,%s,%s' % \
+                      (deployment['Date'], deployment['Time'], deployment['Environment'], deployment['Project'], deployment['Release'])
+            sys.exit(0)
+
+        projects = extract_objects(scrape(urlFactory.url_project(), config['api_key'])['Items'], 'Id', 'Name')
+        releases = extract_objects(scrape(urlFactory.url_release(), config['api_key'])['Items'], 'Id', 'Version')
+
         response = scrape(url, config['api_key'])
         deployments = []
 
