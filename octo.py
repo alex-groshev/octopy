@@ -36,6 +36,47 @@ class UrlFactory:
     def url_release(self, rel_id='all'):
         return self.url_api() + '/releases' if rel_id == 'all' else self.url_api() + '/releases/' + rel_id
 
+    def url_next(self, crawl, json):
+        if crawl:
+            return self.server + json['Links']['Page.Next'] if json['Links'] and 'Page.Next' in json['Links'] else None
+        else:
+            return False
+
+
+class OctopyIO:
+    def __init__(self, cache_dir):
+        self.cache_dir = cache_dir
+
+    def save_dict(self, file_name, dictionary):
+        if not os.path.isdir(self.cache_dir):
+            os.makedirs(self.cache_dir)
+        with open('%s/%s' % (self.cache_dir, file_name), 'w') as f:
+            w = csv.writer(f, delimiter=',', quotechar='|', lineterminator='\n')
+            for k in dictionary.keys():
+                w.writerow([k, dictionary[k]])
+
+    def read_dict(self, file_name):
+        result = {}
+        with open('%s/%s' % (self.cache_dir, file_name), 'r') as f:
+            reader = csv.reader(f, delimiter=',', quotechar='|', lineterminator='\n')
+            for row in reader:
+                result[row[0]] = row[1]
+        return result
+
+    def save_list(self, file_name, list, keys):
+        if not os.path.isdir(self.cache_dir):
+            os.makedirs(self.cache_dir)
+        with open('%s/%s' % (self.cache_dir, file_name), 'w') as f:
+            w = csv.DictWriter(f, keys, delimiter=',', quotechar='|', lineterminator='\n')
+            w.writerows(list)
+
+    def read_list(self, file_name, keys):
+        result = []
+        with open('%s/%s' % (self.cache_dir, file_name), 'r') as f:
+            reader = csv.DictReader(f, keys, delimiter=',', quotechar='|', lineterminator='\n')
+            for row in reader:
+                result.append(row)
+        return result
 
 class Octopy:
     def __init__(self, config):
@@ -45,6 +86,9 @@ class Octopy:
         self.deployments = []
         self.config = config
         self.url_factory = UrlFactory(self.config['server'])
+        self.io = OctopyIO(self.config['dir_tmp'])
+        # keys for csv
+        self.keys_deployments = ['Id', 'Date', 'Time', 'Environment', 'Project', 'Release']
         # cache file names
         self.file_environments = 'environments.csv'
         self.file_projects = 'projects.csv'
@@ -53,44 +97,59 @@ class Octopy:
 
     def get_environments(self, cache=False):
         if cache:
-            return self.__read_objects(self.file_environments)
+            return self.io.read_dict(self.file_environments)
         self.environments = Octopy.__extract_objects(self.__scrape(self.url_factory.url_environment()), 'Id', 'Name')
-        self.__save_objects(self.file_environments, self.environments)
+        self.io.save_dict(self.file_environments, self.environments)
         return self.environments
 
     def get_projects(self, cache=False):
         if cache:
-            return self.__read_objects(self.file_projects)
+            return self.io.read_dict(self.file_projects)
         self.projects = Octopy.__extract_objects(self.__scrape(self.url_factory.url_project()), 'Id', 'Name')
-        self.__save_objects(self.file_projects, self.projects)
+        self.io.save_dict(self.file_projects, self.projects)
         return self.projects
 
     def get_releases(self, cache=False, crawl=False):
+        self.releases = self.io.read_dict(self.file_releases)
+
         if cache:
-            return self.__read_objects(self.file_releases)
+            return self.releases
 
         url = self.url_factory.url_release()
         while url:
             response = self.__scrape(url)
-            self.releases.update(Octopy.__extract_objects(response['Items'], 'Id', 'Version'))
-            url = self.__get_next_url(crawl, response)
+            releases = Octopy.__extract_objects(response['Items'], 'Id', 'Version')
+            diff = set(releases.keys()) - set(self.releases.keys())
+            if len(diff) > 0:
+                for d in list(diff):
+                    self.releases.update({d: releases[d]})
+            # Abort crawling when no updates found
+            url = False if len(diff) == 0 and crawl else self.url_factory.url_next(crawl, response)
 
-        self.__save_objects(self.file_releases, self.releases)
+        self.io.save_dict(self.file_releases, self.releases)
         return self.releases
 
     def get_deployments(self, cache=False, crawl=False):
+        self.deployments = self.io.read_list(self.file_deployments, self.keys_deployments)
+
         if cache:
-            return self.__read_list(self.file_deployments)
+            return self.deployments
 
         self.get_environments(cache=False)
         self.get_projects(cache=False)
         self.get_releases(False, crawl)
-        self.deployments = []
 
+        abort = False
+        ids = {d['Id'] for d in self.deployments}
         url = self.url_factory.url_deployments()
         while url:
             response = self.__scrape(url)
             for dep in response['Items']:
+                if Octopy.__get_numeric_deployment_id(dep['Id']) in ids:
+                    # Stop processing, deployment is already saved
+                    abort = True
+                    break
+
                 if not crawl:
                     if dep['ReleaseId'] not in self.releases:
                         release = self.__scrape(self.url_factory.url_release(dep['ReleaseId']))
@@ -99,21 +158,23 @@ class Octopy:
                 dt = dateutil.parser.parse(dep['Created'])
 
                 self.deployments.append({
-                    'Id': dep['Id'],
+                    'Id': Octopy.__get_numeric_deployment_id(dep['Id']),
                     'Date': dt.date(),
                     'Time': dt.time().strftime('%H:%M'),
                     'Environment': self.environments[dep['EnvironmentId']],
                     'Project': self.projects[dep['ProjectId']],
                     'Release': self.releases[dep['ReleaseId']]
                 })
-            url = self.__get_next_url(crawl, response)
+            url = False if abort else self.url_factory.url_next(crawl, response)
 
-        self.__save_objects(self.file_projects, self.projects)
-        self.__save_objects(self.file_releases, self.releases)
-        self.__save_list(self.file_deployments, self.deployments)
+        self.io.save_dict(self.file_projects, self.projects)
+        self.io.save_dict(self.file_releases, self.releases)
+        self.io.save_list(self.file_deployments, self.deployments, self.keys_deployments)
         return self.deployments
 
     def __scrape(self, url):
+        if __debug__:
+            print 'GET:', url
         return requests.get(url, headers={'X-Octopus-ApiKey': self.config['api_key']}).json()
 
     @staticmethod
@@ -123,44 +184,9 @@ class Octopy:
             result[obj[o_id]] = obj[o_value]
         return result
 
-    def __save_objects(self, file_name, objects):
-        if not os.path.isdir(self.config['dir_tmp']):
-            os.makedirs(self.config['dir_tmp'])
-        with open('%s/%s' % (self.config['dir_tmp'], file_name), 'w') as f:
-            w = csv.writer(f, delimiter=',', quotechar='|', lineterminator='\n')
-            for k in objects.keys():
-                w.writerow([k, objects[k]])
-
-    def __read_objects(self, file_name):
-        result = {}
-        with open('%s/%s' % (self.config['dir_tmp'], file_name), 'r') as f:
-            reader = csv.reader(f, delimiter=',', quotechar='|', lineterminator='\n')
-            for row in reader:
-                result[row[0]] = row[1]
-        return result
-
-    def __save_list(self, file_name, list):
-        if not os.path.isdir(self.config['dir_tmp']):
-            os.makedirs(self.config['dir_tmp'])
-        keys = ['Id', 'Date', 'Time', 'Environment', 'Project', 'Release']
-        with open('%s/%s' % (self.config['dir_tmp'], file_name), 'w') as f:
-            w = csv.DictWriter(f, keys, delimiter=',', quotechar='|', lineterminator='\n')
-            w.writerows(list)
-
-    def __read_list(self, file_name):
-        result = []
-        keys = ['Id', 'Date', 'Time', 'Environment', 'Project', 'Release']
-        with open('%s/%s' % (self.config['dir_tmp'], file_name), 'r') as f:
-            reader = csv.DictReader(f, keys, delimiter=',', quotechar='|', lineterminator='\n')
-            for row in reader:
-                result.append(row)
-        return result
-
-    def __get_next_url(self, crawl, json):
-        if crawl:
-            return self.config['server'] + json['Links']['Page.Next'] if json['Links'] and 'Page.Next' in json['Links'] else None
-        else:
-            return None
+    @staticmethod
+    def __get_numeric_deployment_id(an_deployment_id):
+        return an_deployment_id[12:]
 
 
 def main():
