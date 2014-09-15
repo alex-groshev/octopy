@@ -9,14 +9,13 @@ Tested on
 - Octopus REST API ver. 3.0.0
 
 Supported Commands
-- env - Environments (Id, Name)
-- proj - Projects (Id, Name)
-- rel - Releases (Id, Version)
-- dep - Deployments ([Id], Date, Time, Environment, Project, Release, Specific Machines)
-- mac - Machines (Id, Name)
+- "--cmd env" - Environments (Id, Name)
+- "--cmd proj" - Projects (Id, Name)
+- "--cmd rel" - Releases (Id, Version)
+- "--cmd dep" - Deployments ([Id], Date, Time, Environment, Project, Release, Specific Machines)
+- "--cmd mac" - Machines (Id, Name)
 
 Extras
-- Octopy saves/reads data to/from csv files. Specify --cache to read data from files only.
+- Octopy saves/reads data to/from CSV files. Specify "--cache" to read data from files.
 - Specify --headers to print column names.
-- crawl By default only 30 items per page are returned by API. This parameter enables link crawl.
-  All resources from the "Link" collection will be crawled by Octopy and data will be saved to cache. 
+- "--crawl" enables link crawl. By default only 30 items per page are returned by API. All resources from the "Link" collection will be crawled by Octopy and data will be saved to cache. 
