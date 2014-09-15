@@ -60,10 +60,11 @@ class OctopyIO:
 
     def read_dict(self, file_name):
         result = {}
-        with open('%s/%s' % (self.cache_dir, file_name), 'r') as f:
-            reader = csv.reader(f, delimiter=',', quotechar='|', lineterminator='\n')
-            for row in reader:
-                result[row[0]] = row[1]
+        if os.path.isfile(file_name):
+            with open('%s/%s' % (self.cache_dir, file_name), 'r') as f:
+                reader = csv.reader(f, delimiter=',', quotechar='|', lineterminator='\n')
+                for row in reader:
+                    result[row[0]] = row[1]
         return result
 
     def save_list(self, file_name, list, keys):
@@ -75,10 +76,11 @@ class OctopyIO:
 
     def read_list(self, file_name, keys):
         result = []
-        with open('%s/%s' % (self.cache_dir, file_name), 'r') as f:
-            reader = csv.DictReader(f, keys, delimiter=',', quotechar='|', lineterminator='\n')
-            for row in reader:
-                result.append(row)
+        if os.path.isfile(file_name):
+            with open('%s/%s' % (self.cache_dir, file_name), 'r') as f:
+                reader = csv.DictReader(f, keys, delimiter=',', quotechar='|', lineterminator='\n')
+                for row in reader:
+                    result.append(row)
         return result
 
 class Octopy:
@@ -92,7 +94,7 @@ class Octopy:
         self.url_factory = UrlFactory(self.config['server'])
         self.io = OctopyIO(self.config['dir_tmp'])
         # keys for csv
-        self.keys_deployments = ['Id', 'Date', 'Time', 'Environment', 'Project', 'Release']
+        self.keys_deployments = ['Id', 'Date', 'Time', 'Environment', 'Project', 'Release', 'SpecificMachines']
         # cache file names
         self.file_environments = 'environments.csv'
         self.file_projects = 'projects.csv'
@@ -149,6 +151,7 @@ class Octopy:
 
         self.get_environments(cache=False)
         self.get_projects(cache=False)
+        self.get_machines(cache=False)
         self.get_releases(False, crawl)
 
         abort = False
@@ -175,7 +178,8 @@ class Octopy:
                     'Time': dt.time().strftime('%H:%M'),
                     'Environment': self.environments[dep['EnvironmentId']],
                     'Project': self.projects[dep['ProjectId']],
-                    'Release': self.releases[dep['ReleaseId']]
+                    'Release': self.releases[dep['ReleaseId']],
+                    'SpecificMachines': self.__extract_machines(dep['SpecificMachineIds'])
                 })
             url = False if abort else self.url_factory.url_next(crawl, response)
 
@@ -183,6 +187,16 @@ class Octopy:
         self.io.save_dict(self.file_releases, self.releases)
         self.io.save_list(self.file_deployments, self.deployments, self.keys_deployments)
         return self.deployments
+
+    def __extract_machines(self, machine_ids):
+        if machine_ids:
+            for m_id in machine_ids:
+                if m_id not in self.machines:
+                    # Assume machine is deleted if it doesn't exist in 'machines' array.
+                    self.machines[m_id] = 'DEL-' + m_id
+            return ','.join([self.machines[x] for x in machine_ids])
+        else:
+            return ''
 
     def __scrape(self, url):
         if __debug__:
@@ -210,7 +224,7 @@ def main():
 
     parser = argparse.ArgumentParser(
         description='Octopy is a small application that prints out information from Octopus in a convenient format.')
-    parser.add_argument('--cmd', dest='command', help="Octopy command (try `env`, `proj`, `rel` and `dep`).")
+    parser.add_argument('--cmd', dest='command', help="Octopy command (try `env`, `proj`, `rel`, `dep` and `mac`).")
     parser.add_argument('--cache', dest='cache', action='store_true', help="Read data from cache if available.")
     parser.add_argument('--headers', dest='headers', action='store_true', help='Display headers in output.')
     parser.add_argument('--crawl', dest='crawl', action='store_true',
@@ -248,9 +262,10 @@ def main():
     elif args.command == 'dep':  # deployments
         deployments = octopy.get_deployments(args.cache, args.crawl)
         if args.headers:
-            print 'Date,Time,Environment,Project,Release'
+            print 'Date,Time,Environment,Project,Release,SpecificMachines'
         for dep in deployments:
-            print '%s,%s,%s,%s,%s' % (dep['Date'], dep['Time'], dep['Environment'], dep['Project'], dep['Release'])
+            print '%s,%s,%s,%s,%s,%s' %\
+                  (dep['Date'], dep['Time'], dep['Environment'], dep['Project'], dep['Release'], dep['SpecificMachines'])
     else:
         print "Unknown command '%s'" % args.command
         parser.print_help()
