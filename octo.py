@@ -42,6 +42,9 @@ class UrlFactory:
         else:
             return False
 
+    def url_machines(self):
+        return self.url_api() + '/machines/all'
+
 
 class OctopyIO:
     def __init__(self, cache_dir):
@@ -83,6 +86,7 @@ class Octopy:
         self.environments = {}
         self.projects = {}
         self.releases = {}
+        self.machines = {}
         self.deployments = []
         self.config = config
         self.url_factory = UrlFactory(self.config['server'])
@@ -94,6 +98,7 @@ class Octopy:
         self.file_projects = 'projects.csv'
         self.file_releases = 'releases.csv'
         self.file_deployments = 'deployments.csv'
+        self.file_machines = 'machines.csv'
 
     def get_environments(self, cache=False):
         if cache:
@@ -108,6 +113,13 @@ class Octopy:
         self.projects = Octopy.__extract_objects(self.__scrape(self.url_factory.url_project()), 'Id', 'Name')
         self.io.save_dict(self.file_projects, self.projects)
         return self.projects
+
+    def get_machines(self, cache=False):
+        if cache:
+            return self.io.read_dict(self.file_machines)
+        self.machines = Octopy.__extract_objects(self.__scrape(self.url_factory.url_machines()), 'Id', 'Name')
+        self.io.save_dict(self.file_machines, self.machines)
+        return self.machines
 
     def get_releases(self, cache=False, crawl=False):
         self.releases = self.io.read_dict(self.file_releases)
@@ -227,6 +239,12 @@ def main():
             print 'Id,Version'
         for key in releases.keys():
             print '%s,%s' % (key, releases[key])
+    elif args.command == 'mac': # machines
+        machines = octopy.get_machines(args.cache)
+        if args.headers:
+            print 'Id,Name'
+        for key in machines.keys():
+            print '%s,%s' % (key, machines[key])
     elif args.command == 'dep':  # deployments
         deployments = octopy.get_deployments(args.cache, args.crawl)
         if args.headers:
