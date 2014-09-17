@@ -60,8 +60,9 @@ class OctopyIO:
 
     def read_dict(self, file_name):
         result = {}
-        if os.path.isfile(file_name):
-            with open('%s/%s' % (self.cache_dir, file_name), 'r') as f:
+        full_path = '%s/%s' % (self.cache_dir, file_name)
+        if os.path.exists(full_path):
+            with open(full_path, 'r') as f:
                 reader = csv.reader(f, delimiter=',', quotechar='|', lineterminator='\n')
                 for row in reader:
                     result[row[0]] = row[1]
@@ -76,8 +77,9 @@ class OctopyIO:
 
     def read_list(self, file_name, keys):
         result = []
-        if os.path.isfile(file_name):
-            with open('%s/%s' % (self.cache_dir, file_name), 'r') as f:
+        full_path = '%s/%s' % (self.cache_dir, file_name)
+        if os.path.exists(full_path):
+            with open(full_path, 'r') as f:
                 reader = csv.DictReader(f, keys, delimiter=',', quotechar='|', lineterminator='\n')
                 for row in reader:
                     result.append(row)
