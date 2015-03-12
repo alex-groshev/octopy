@@ -5,7 +5,7 @@ Octopy is a small application that prints out information from [Octopus Deploy](
 [Octopus REST API](http://docs.octopusdeploy.com/display/OD/Octopus+REST+API).
 
 Tested on
-- Octopus Deploy ver. 2.5.x
+- Octopus Deploy ver. 2.5.x, 2.6.2.x
 - Octopus REST API ver. 3.0.0
 
 Supported Commands
@@ -17,5 +17,5 @@ Supported Commands
 
 Extras
 - Octopy saves/reads data to/from CSV files. Specify "--cache" to read data from files.
-- Specify --headers to print column names.
+- Specify "--headers" to print column names.
 - "--crawl" enables link crawl. By default only 30 items per page are returned by API. All resources from the "Link" collection will be crawled by Octopy and data will be saved to cache. 
