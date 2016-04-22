@@ -5,7 +5,7 @@ Octopy is a small application that prints out information from [Octopus Deploy](
 [Octopus REST API](http://docs.octopusdeploy.com/display/OD/Octopus+REST+API).
 
 Tested on
-- Octopus Deploy ver. 2.5.x, 2.6.2.x
+- Octopus Deploy ver. 2.4.5.x, 2.5.x, 2.6.2.x
 - Octopus REST API ver. 3.0.0
 
 Supported Commands
