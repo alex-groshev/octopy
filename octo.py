@@ -1,5 +1,5 @@
 import sys
-from ConfigParser import ConfigParser
+import configparser
 import requests
 import dateutil.parser
 import argparse
@@ -9,7 +9,7 @@ import os
 
 def get_configs(conf_file):
     result = {}
-    cp = ConfigParser()
+    cp = configparser.ConfigParser()
     cp.read(conf_file)
     result['server'] = cp.get('Octopus', 'server')
     result['api_key'] = cp.get('Octopus', 'api_key')
@@ -202,7 +202,7 @@ class Octopy:
 
     def __scrape(self, url):
         if __debug__:
-            print 'GET:', url
+            print('GET:', url)
         return requests.get(url, headers={'X-Octopus-ApiKey': self.config['api_key']}).json()
 
     @staticmethod
@@ -221,7 +221,7 @@ def main():
     config = get_configs('octopy.cfg')
 
     if not config['server'] or not config['api_key']:
-        print 'Please, specify Octopus parameters in configuration file!'
+        print('Please, specify Octopus parameters in configuration file!')
         sys.exit(1)
 
     parser = argparse.ArgumentParser(
@@ -240,36 +240,36 @@ def main():
     if args.command == 'env':  # environments
         environments = octopy.get_environments(args.cache)
         if args.headers:
-            print 'Id,Name'
+            print('Id,Name')
         for key in environments.keys():
-            print '%s,%s' % (key, environments[key])
+            print('%s,%s' % (key, environments[key]))
     elif args.command == 'proj':  # projects
         projects = octopy.get_projects(args.cache)
         if args.headers:
-            print 'Id,Name'
+            print('Id,Name')
         for key in projects.keys():
-            print '%s,%s' % (key, projects[key])
+            print('%s,%s' % (key, projects[key]))
     elif args.command == 'rel':  # releases
         releases = octopy.get_releases(args.cache, args.crawl)
         if args.headers:
-            print 'Id,Version'
+            print('Id,Version')
         for key in releases.keys():
-            print '%s,%s' % (key, releases[key])
+            print('%s,%s' % (key, releases[key]))
     elif args.command == 'mac': # machines
         machines = octopy.get_machines(args.cache)
         if args.headers:
-            print 'Id,Name'
+            print('Id,Name')
         for key in machines.keys():
-            print '%s,%s' % (key, machines[key])
+            print('%s,%s' % (key, machines[key]))
     elif args.command == 'dep':  # deployments
         deployments = octopy.get_deployments(args.cache, args.crawl)
         if args.headers:
-            print 'Date,Time,Environment,Project,Release,SpecificMachines'
+            print('Date,Time,Environment,Project,Release,SpecificMachines')
         for dep in deployments:
-            print '%s,%s,%s,%s,%s,%s' %\
-                  (dep['Date'], dep['Time'], dep['Environment'], dep['Project'], dep['Release'], dep['SpecificMachines'])
+            print('%s,%s,%s,%s,%s,%s' %\
+                  (dep['Date'], dep['Time'], dep['Environment'], dep['Project'], dep['Release'], dep['SpecificMachines']))
     else:
-        print "Unknown command '%s'" % args.command
+        print("Unknown command '%s'" % args.command)
         parser.print_help()
 
 

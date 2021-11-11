@@ -1,11 +1,11 @@
 Octopy
 ======
 
-Octopy is a small application that prints out information from [Octopus Deploy](http://octopusdeploy.com/) in CSV format. It's built on top of the
-[Octopus REST API](http://docs.octopusdeploy.com/display/OD/Octopus+REST+API).
+Octopy is a small application that prints out information from [Octopus Deploy](http://octopus.com/) in CSV format. It's built on top of the
+[Octopus REST API](https://octopus.com/docs/octopus-rest-api).
 
 Tested on
-- Octopus Deploy ver. 2.4.5.x, 2.5.x, 2.6.2.x
+- Octopus Deploy ver. 2.4.5.x, 2.5.x, 2.6.2.x, 2019.6.x
 - Octopus REST API ver. 3.0.0
 
 Supported Commands
